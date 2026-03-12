@@ -1,23 +1,23 @@
 {
   "dashboardTitle": "Veille RSS",
-  "refreshMinutes": 10,
+  "refreshMinutes": 5,
   "maxItems": 15,
   "requestTimeoutMs": 12000,
   "timezone": "Europe/Paris",
   "feeds": [
     {
-      "name": "Le Monde",
-      "url": "https://www.lemonde.fr/rss/une.xml",
+      "name": "Korben",
+      "url": "https://korben.info/feed/",
       "enabled": true
     },
     {
-      "name": "Franceinfo",
-      "url": "https://www.francetvinfo.fr/titres.rss",
+      "name": "Bleeping Computer",
+      "url": "https://www.bleepingcomputer.com/feed/",
       "enabled": true
     },
     {
-      "name": "The Verge",
-      "url": "https://www.theverge.com/rss/index.xml",
+      "name": "The Hacker News",
+      "url": "https://feeds.feedburner.com/TheHackersNews",
       "enabled": false
     }
   ]
