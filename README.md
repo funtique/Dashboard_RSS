@@ -20,6 +20,8 @@ Edite `feeds.json` :
 - `refreshMinutes` : frequence de rafraichissement
 - `maxItems` : nombre maximum d'articles affiches
 - `timezone` : fuseau horaire d'affichage
+- `display.itemsPerPage` : nombre de cartes affichees par page (defaut: 12)
+- `display.rotationSeconds` : rotation automatique des pages en secondes (defaut: 20)
 - `feeds` : liste des flux RSS
 
 Exemple :
@@ -30,6 +32,10 @@ Exemple :
   "refreshMinutes": 10,
   "maxItems": 24,
   "timezone": "Europe/Paris",
+  "display": {
+    "itemsPerPage": 12,
+    "rotationSeconds": 20
+  },
   "feeds": [
     {
       "name": "Le Monde",

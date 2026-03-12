@@ -36,6 +36,7 @@ app.get("/api/feed", async (_req, res) => {
   try {
     const config = await readConfig();
     const items = await getCachedFeedItems(config);
+    const display = getDisplaySettings(config);
 
     res.json({
       meta: {
@@ -43,7 +44,8 @@ app.get("/api/feed", async (_req, res) => {
         refreshMinutes: config.refreshMinutes || 10,
         maxItems: config.maxItems || 24,
         timezone: config.timezone || "Europe/Paris",
-        generatedAt: cache.generatedAt || new Date().toISOString()
+        generatedAt: cache.generatedAt || new Date().toISOString(),
+        display
       },
       items
     });
@@ -282,4 +284,17 @@ function hostnameFromUrl(value) {
   } catch (_error) {
     return value;
   }
+}
+
+function getDisplaySettings(config) {
+  const display = config?.display || {};
+  return {
+    itemsPerPage: toPositiveInteger(display.itemsPerPage, 12),
+    rotationSeconds: toPositiveInteger(display.rotationSeconds, 20)
+  };
+}
+
+function toPositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
