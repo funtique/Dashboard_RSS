@@ -82,7 +82,9 @@ function renderPayload(payload) {
     fragment.querySelector(".publish-date").textContent = formatterDate.format(publishedDate);
     fragment.querySelector(".source-badge").textContent = item.source;
     freshnessBadge.textContent = freshness.label;
-    freshnessBadge.classList.add(freshness.className);
+    if (freshness.className) {
+      freshnessBadge.classList.add(freshness.className);
+    }
 
     if (item.image) {
       image.src = item.image;
