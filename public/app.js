@@ -1,4 +1,4 @@
-const body = document.getElementById("feed-body");
+const body = document.getElementById("feed-grid");
 const rowTemplate = document.getElementById("row-template");
 const dashboardTitle = document.getElementById("dashboard-title");
 const boardSubtitle = document.getElementById("board-subtitle");
@@ -63,15 +63,15 @@ function renderPayload(payload) {
   body.innerHTML = "";
 
   if (!items.length) {
-    body.innerHTML = `<tr><td colspan="4" class="empty-state">Aucun article disponible. Verifie les flux dans <code>feeds.json</code>.</td></tr>`;
+    body.innerHTML = `<div class="empty-state">Aucun article disponible. Verifie les flux dans <code>feeds.json</code>.</div>`;
     return;
   }
 
   for (const item of items) {
     const fragment = rowTemplate.content.cloneNode(true);
-    const row = fragment.querySelector("tr");
+    const row = fragment.querySelector(".feed-card");
     const image = fragment.querySelector(".thumb");
-    const frame = fragment.querySelector(".thumb-frame");
+    const fallback = fragment.querySelector(".thumb-fallback");
 
     fragment.querySelector(".article-title").textContent = item.title;
     fragment.querySelector(".article-summary").textContent = item.summary || item.link;
@@ -83,15 +83,15 @@ function renderPayload(payload) {
       image.src = item.image;
       image.alt = item.title;
       image.classList.add("visible");
-      frame.classList.add("has-image");
       image.addEventListener(
         "error",
         () => {
           image.classList.remove("visible");
-          frame.classList.remove("has-image");
+          fallback.style.display = "grid";
         },
         { once: true }
       );
+      fallback.style.display = "none";
     }
 
     row.dataset.href = item.link;
@@ -104,7 +104,7 @@ function renderError(message) {
   boardSubtitle.textContent = "Flux indisponibles";
   generatedAt.textContent = "Le dashboard retentera automatiquement.";
   refreshLabel.textContent = "Erreur de chargement";
-  body.innerHTML = `<tr><td colspan="4" class="empty-state">${escapeHtml(message)}</td></tr>`;
+  body.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
 }
 
 function scheduleRefresh(minutes) {

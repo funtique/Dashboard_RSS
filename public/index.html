@@ -37,48 +37,29 @@
             </div>
           </div>
 
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Illustration</th>
-                  <th>Article</th>
-                  <th>Publication</th>
-                  <th>Source</th>
-                </tr>
-              </thead>
-              <tbody id="feed-body"></tbody>
-            </table>
-          </div>
+          <section id="feed-grid" class="feed-grid" aria-live="polite"></section>
         </section>
       </main>
     </div>
 
-    <template id="row-template">
-      <tr>
-        <td>
-          <div class="thumb-frame">
+      <template id="row-template">
+        <article class="feed-card">
+          <div class="card-media">
             <img class="thumb" alt="" loading="lazy" />
             <div class="thumb-fallback">RSS</div>
+            <span class="source-badge"></span>
           </div>
-        </td>
-        <td>
-          <div class="article-cell">
+
+          <div class="card-body">
+            <div class="publish-cell">
+              <p class="publish-time"></p>
+              <p class="publish-date"></p>
+            </div>
             <p class="article-title"></p>
             <p class="article-summary"></p>
           </div>
-        </td>
-        <td>
-          <div class="publish-cell">
-            <p class="publish-time"></p>
-            <p class="publish-date"></p>
-          </div>
-        </td>
-        <td>
-          <span class="source-badge"></span>
-        </td>
-      </tr>
-    </template>
+        </article>
+      </template>
 
     <script src="/app.js" defer></script>
   </body>
