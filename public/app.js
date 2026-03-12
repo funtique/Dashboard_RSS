@@ -72,12 +72,17 @@ function renderPayload(payload) {
     const row = fragment.querySelector(".feed-card");
     const image = fragment.querySelector(".thumb");
     const fallback = fragment.querySelector(".thumb-fallback");
+    const freshnessBadge = fragment.querySelector(".freshness-badge");
+    const publishedDate = new Date(item.publishedAt);
+    const freshness = getFreshness(publishedDate);
 
     fragment.querySelector(".article-title").textContent = item.title;
     fragment.querySelector(".article-summary").textContent = item.summary || item.link;
-    fragment.querySelector(".publish-time").textContent = formatterTime.format(new Date(item.publishedAt));
-    fragment.querySelector(".publish-date").textContent = formatterDate.format(new Date(item.publishedAt));
+    fragment.querySelector(".publish-time").textContent = formatterTime.format(publishedDate);
+    fragment.querySelector(".publish-date").textContent = formatterDate.format(publishedDate);
     fragment.querySelector(".source-badge").textContent = item.source;
+    freshnessBadge.textContent = freshness.label;
+    freshnessBadge.classList.add(freshness.className);
 
     if (item.image) {
       image.src = item.image;
@@ -119,4 +124,27 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getFreshness(date) {
+  const ageMinutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+
+  if (ageMinutes <= 120) {
+    return {
+      label: `${ageMinutes} min`,
+      className: "is-hot"
+    };
+  }
+
+  if (ageMinutes <= 720) {
+    return {
+      label: `${Math.round(ageMinutes / 60)} h`,
+      className: "is-fresh"
+    };
+  }
+
+  return {
+    label: `${Math.round(ageMinutes / 1440)} j`,
+    className: ""
+  };
 }
