@@ -101,8 +101,9 @@ function renderCurrentPage() {
     return;
   }
 
-  for (const item of pageItems) {
+  pageItems.forEach((item, index) => {
     const fragment = rowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector(".feed-card");
     const image = fragment.querySelector(".thumb");
     const fallback = fragment.querySelector(".thumb-fallback");
     const freshnessBadge = fragment.querySelector(".freshness-badge");
@@ -135,8 +136,9 @@ function renderCurrentPage() {
       fallback.style.display = "none";
     }
 
+    row.style.setProperty("--delay-index", index);
     body.appendChild(fragment);
-  }
+  });
 }
 
 function renderError(message) {
