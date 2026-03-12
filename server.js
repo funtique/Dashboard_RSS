@@ -28,6 +28,7 @@ const cache = {
   generatedAt: null,
   items: []
 };
+const articleImageCache = new Map();
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -79,7 +80,9 @@ async function loadFeedItems(config) {
       return rightDate - leftDate;
     });
 
-  return items.slice(0, config.maxItems || 24);
+  const limitedItems = items.slice(0, config.maxItems || 24);
+  await enrichItemsWithImages(limitedItems);
+  return limitedItems;
 }
 
 async function getCachedFeedItems(config) {
@@ -118,6 +121,13 @@ async function loadSingleFeed(feed, timeoutOverride) {
     console.warn(`Flux ignore: ${feed.name || feed.url} (${error.message})`);
     return [];
   }
+}
+
+async function enrichItemsWithImages(items) {
+  const targets = items.filter((item) => !item.image && item.link);
+  await Promise.allSettled(targets.map(async (item) => {
+    item.image = await extractImageFromArticle(item.link);
+  }));
 }
 
 function normalizeItem(item, feed, parsedFeed) {
@@ -192,6 +202,54 @@ function extractImage(item) {
   return null;
 }
 
+async function extractImageFromArticle(url) {
+  if (articleImageCache.has(url)) {
+    return articleImageCache.get(url);
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml"
+      }
+    });
+
+    if (!response.ok) {
+      articleImageCache.set(url, null);
+      return null;
+    }
+
+    const html = await response.text();
+    const image = extractMetaImage(html);
+    articleImageCache.set(url, image);
+    return image;
+  } catch (_error) {
+    articleImageCache.set(url, null);
+    return null;
+  }
+}
+
+function extractMetaImage(html) {
+  const patterns = [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+    /<img[^>]+src=["']([^"']+)["']/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match && isUsableImageUrl(match[1])) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
 function pickImageUrl(entry) {
   if (!entry) {
     return null;
@@ -203,11 +261,15 @@ function pickImageUrl(entry) {
 
   const values = [entry.url, entry.$?.url, entry.href, entry.$?.href, entry.link, entry.path];
 
-  return values.find((value) => typeof value === "string" && isImageUrl(value)) || null;
+  return values.find((value) => typeof value === "string" && isUsableImageUrl(value)) || null;
 }
 
 function isImageUrl(value) {
   return /^https?:\/\//i.test(value) && /\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(value);
+}
+
+function isUsableImageUrl(value) {
+  return /^https?:\/\//i.test(value) && !value.includes("data:image");
 }
 
 function stripHtml(value) {
