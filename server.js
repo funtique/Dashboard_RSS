@@ -106,15 +106,16 @@ async function getCachedFeedItems(config) {
 }
 
 async function loadSingleFeed(feed, timeoutOverride) {
+  const timeoutMs = toPositiveInteger(timeoutOverride, 12000);
   const localParser = timeoutOverride
     ? new Parser({
-        timeout: timeoutOverride,
-        customFields: parserCustomFields
-      })
+      timeout: timeoutMs,
+      customFields: parserCustomFields
+    })
     : parser;
 
   try {
-    const parsedFeed = await localParser.parseURL(feed.url);
+    const parsedFeed = await parseFeedWithFallback(localParser, feed.url, timeoutMs);
 
     return (parsedFeed.items || [])
       .map((item) => normalizeItem(item, feed, parsedFeed))
@@ -123,6 +124,63 @@ async function loadSingleFeed(feed, timeoutOverride) {
     console.warn(`Flux ignore: ${feed.name || feed.url} (${error.message})`);
     return [];
   }
+}
+
+async function parseFeedWithFallback(localParser, url, timeoutMs) {
+  try {
+    return await localParser.parseURL(url);
+  } catch (error) {
+    const xml = await fetchFeedXmlWithRetry(url, timeoutMs);
+    return localParser.parseString(xml);
+  }
+}
+
+async function fetchFeedXmlWithRetry(url, timeoutMs) {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+          Accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+          "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+          Referer: "https://korben.info/"
+        },
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+
+      if (response.ok) {
+        return response.text();
+      }
+
+      if (!isRetryableStatus(response.status) || attempt === maxAttempts) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      if (attempt === maxAttempts || !isRetryableFetchError(error)) {
+        throw error;
+      }
+    }
+
+    await wait(700 * attempt);
+  }
+
+  throw new Error("Impossible de recuperer le flux RSS.");
+}
+
+function isRetryableStatus(status) {
+  return status === 429 || status >= 500;
+}
+
+function isRetryableFetchError(error) {
+  const message = String(error?.message || "");
+  return error?.name === "TimeoutError" || message.includes("network");
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function enrichItemsWithImages(items) {
