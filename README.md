@@ -59,6 +59,9 @@ Avec Docker Compose :
 docker compose up -d --build
 ```
 
+Le conteneur ecoute sur le port interne `3000`, mais le port publie par defaut est `3001`.
+L'URL a utiliser cote navigateur est donc `http://<ip-du-rpi>:3001`.
+
 ## Notes
 
 - certains flux ne fournissent pas toujours d'image
