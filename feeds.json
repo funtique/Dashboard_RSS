@@ -1,0 +1,24 @@
+{
+  "dashboardTitle": "Veille RSS",
+  "refreshMinutes": 10,
+  "maxItems": 24,
+  "requestTimeoutMs": 12000,
+  "timezone": "Europe/Paris",
+  "feeds": [
+    {
+      "name": "Le Monde",
+      "url": "https://www.lemonde.fr/rss/une.xml",
+      "enabled": true
+    },
+    {
+      "name": "Franceinfo",
+      "url": "https://www.francetvinfo.fr/titres.rss",
+      "enabled": true
+    },
+    {
+      "name": "The Verge",
+      "url": "https://www.theverge.com/rss/index.xml",
+      "enabled": false
+    }
+  ]
+}

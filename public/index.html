@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard RSS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Supervision</p>
+          <h1 id="dashboard-title">Veille RSS</h1>
+        </div>
+        <div class="status-block">
+          <div class="status-pill">
+            <span class="status-dot"></span>
+            <span id="refresh-label">Mise a jour...</span>
+          </div>
+          <p id="generated-at" class="generated-at"></p>
+        </div>
+      </header>
+
+      <main>
+        <section class="board-card">
+          <div class="board-head">
+            <div>
+              <p class="board-label">Flux recents</p>
+              <p id="board-subtitle" class="board-subtitle"></p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Illustration</th>
+                  <th>Article</th>
+                  <th>Publication</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="feed-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="row-template">
+      <tr>
+        <td>
+          <div class="thumb-frame">
+            <img class="thumb" alt="" loading="lazy" />
+            <div class="thumb-fallback">RSS</div>
+          </div>
+        </td>
+        <td>
+          <div class="article-cell">
+            <p class="article-title"></p>
+            <p class="article-summary"></p>
+          </div>
+        </td>
+        <td>
+          <div class="publish-cell">
+            <p class="publish-time"></p>
+            <p class="publish-date"></p>
+          </div>
+        </td>
+        <td>
+          <span class="source-badge"></span>
+        </td>
+      </tr>
+    </template>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
