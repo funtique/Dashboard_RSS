@@ -66,6 +66,14 @@
 
           <section id="metrics-grid" class="metrics-grid" aria-label="Indicateurs"></section>
 
+          <section class="health-section">
+            <div class="headline-header">
+              <p class="board-label">Sante des flux</p>
+            </div>
+            <div id="health-summary" class="health-summary"></div>
+            <div id="health-list" class="health-list" aria-live="polite"></div>
+          </section>
+
           <section class="headline-section">
             <div class="headline-header">
               <p class="board-label">Derniers titres</p>
@@ -99,9 +107,22 @@
       <article class="headline-card">
         <div class="headline-meta">
           <span class="headline-source"></span>
-          <span class="headline-freshness"></span>
+          <div class="headline-badges">
+            <span class="headline-criticality criticality-badge"></span>
+            <span class="headline-freshness"></span>
+          </div>
         </div>
         <p class="headline-title"></p>
+      </article>
+    </template>
+
+    <template id="health-template">
+      <article class="health-card">
+        <div class="health-card-top">
+          <span class="health-name"></span>
+          <span class="health-status"></span>
+        </div>
+        <p class="health-note"></p>
       </article>
     </template>
 
@@ -118,6 +139,9 @@
           <div class="publish-cell">
             <p class="publish-time"></p>
             <p class="publish-date"></p>
+          </div>
+          <div class="card-flags">
+            <span class="criticality-badge"></span>
           </div>
           <p class="article-title"></p>
           <p class="article-summary"></p>

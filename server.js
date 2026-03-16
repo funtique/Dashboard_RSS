@@ -30,36 +30,50 @@ const parser = new Parser({
 
 const cache = {
   generatedAt: null,
-  items: []
+  items: [],
+  feedStatuses: [],
+  statusSummary: createStatusSummary([]),
+  sourceConfigPath: null
 };
 const articleImageCache = new Map();
+const feedHealthMemory = new Map();
 
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/feed", async (_req, res) => {
   try {
     const config = await readConfig();
-    const items = await getCachedFeedItems(config);
-    const enabledFeedCount = Array.isArray(config.feeds)
-      ? config.feeds.filter((feed) => feed.enabled !== false && feed.url).length
-      : 0;
+    const snapshot = await getCachedFeedSnapshot(config);
 
     res.json({
-      meta: {
-        title: config.dashboardTitle || "Dashboard RSS",
-        refreshMinutes: getCacheTtlMinutes(config),
-        cacheTtlMinutes: getCacheTtlMinutes(config),
-        maxItems: config.maxItems || 24,
-        timezone: config.timezone || "Europe/Paris",
-        generatedAt: cache.generatedAt || new Date().toISOString(),
-        enabledFeedCount,
-        display: getDisplaySettings(config)
-      },
-      items
+      meta: buildMeta(config, snapshot),
+      items: snapshot.items
     });
   } catch (error) {
     res.status(500).json({
       error: "Impossible de charger les flux RSS.",
+      details: error.message
+    });
+  }
+});
+
+app.get("/api/status", async (_req, res) => {
+  try {
+    const config = await readConfig();
+    const snapshot = await getCachedFeedSnapshot(config);
+
+    res.json({
+      meta: buildMeta(config, snapshot),
+      cache: {
+        generatedAt: snapshot.generatedAt,
+        ageMinutes: getAgeMinutes(snapshot.generatedAt),
+        sourceConfigPath: cache.sourceConfigPath
+      },
+      feeds: snapshot.feedStatuses
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Impossible de charger l'etat des flux.",
       details: error.message
     });
   }
@@ -71,43 +85,64 @@ app.listen(port, () => {
 
 async function readConfig() {
   const activeConfigPath = await resolveConfigPath();
+  cache.sourceConfigPath = activeConfigPath;
   const raw = await fs.readFile(activeConfigPath, "utf8");
   return JSON.parse(raw);
 }
 
-async function loadFeedItems(config) {
-  const enabledFeeds = Array.isArray(config.feeds)
-    ? config.feeds.filter((feed) => feed.enabled !== false && feed.url)
-    : [];
-
-  const requests = enabledFeeds.map((feed) => loadSingleFeed(feed, config.requestTimeoutMs));
-  const settled = await Promise.allSettled(requests);
-
-  const items = settled
-    .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
-    .filter(deduplicateItems)
-    .sort(compareItemsByPriority);
-
-  const limitedItems = items.slice(0, config.maxItems || 24);
-  await enrichItemsWithImages(limitedItems);
-  return limitedItems.map(enrichItemForDisplay);
-}
-
-async function getCachedFeedItems(config) {
+async function getCachedFeedSnapshot(config) {
   const refreshWindowMs = getCacheTtlMinutes(config) * 60 * 1000;
   const now = Date.now();
 
   if (cache.generatedAt) {
     const ageMs = now - new Date(cache.generatedAt).getTime();
     if (ageMs < refreshWindowMs && cache.items.length) {
-      return cache.items.slice(0, config.maxItems || 24);
+      return {
+        generatedAt: cache.generatedAt,
+        items: cache.items.slice(0, config.maxItems || 24),
+        feedStatuses: cache.feedStatuses,
+        statusSummary: cache.statusSummary
+      };
     }
   }
 
-  const items = await loadFeedItems(config);
-  cache.generatedAt = new Date().toISOString();
-  cache.items = items;
-  return items;
+  const snapshot = await loadFeedSnapshot(config);
+  cache.generatedAt = snapshot.generatedAt;
+  cache.items = snapshot.items;
+  cache.feedStatuses = snapshot.feedStatuses;
+  cache.statusSummary = snapshot.statusSummary;
+  return snapshot;
+}
+
+async function loadFeedSnapshot(config) {
+  const enabledFeeds = Array.isArray(config.feeds)
+    ? config.feeds.filter((feed) => feed.enabled !== false && feed.url)
+    : [];
+
+  const requests = enabledFeeds.map((feed) => loadSingleFeed(feed, config.requestTimeoutMs));
+  const settled = await Promise.allSettled(requests);
+  const feedResults = settled.map((result, index) => {
+    if (result.status === "fulfilled") {
+      return result.value;
+    }
+
+    return buildFeedFailure(enabledFeeds[index], result.reason);
+  });
+
+  const items = feedResults
+    .flatMap((result) => result.items)
+    .filter(deduplicateItems)
+    .sort(compareItemsByPriority);
+
+  const limitedItems = items.slice(0, config.maxItems || 24);
+  await enrichItemsWithImages(limitedItems);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    items: limitedItems.map((item) => enrichItemForDisplay(item, config)),
+    feedStatuses: feedResults.map((result) => result.feedStatus),
+    statusSummary: createStatusSummary(feedResults.map((result) => result.feedStatus))
+  };
 }
 
 async function loadSingleFeed(feed, timeoutOverride) {
@@ -118,23 +153,34 @@ async function loadSingleFeed(feed, timeoutOverride) {
       customFields: parserCustomFields
     })
     : parser;
+  const startedAt = Date.now();
 
   try {
     const parsedFeed = await parseFeedWithFallback(localParser, feed.url, timeoutMs);
-
-    return (parsedFeed.items || [])
+    const items = (parsedFeed.items || [])
       .map((item) => normalizeItem(item, feed, parsedFeed))
       .filter((item) => item.title && item.link);
+
+    const feedStatus = updateFeedHealth(feed, {
+      status: items.length ? "ok" : "empty",
+      itemCount: items.length,
+      durationMs: Date.now() - startedAt
+    });
+
+    return {
+      items,
+      feedStatus
+    };
   } catch (error) {
     console.warn(`Flux ignore: ${feed.name || feed.url} (${error.message})`);
-    return [];
+    return buildFeedFailure(feed, error, Date.now() - startedAt);
   }
 }
 
 async function parseFeedWithFallback(localParser, url, timeoutMs) {
   try {
     return await localParser.parseURL(url);
-  } catch (error) {
+  } catch (_error) {
     const xml = await fetchFeedXmlWithRetry(url, timeoutMs);
     return localParser.parseString(xml);
   }
@@ -181,7 +227,7 @@ function isRetryableStatus(status) {
 
 function isRetryableFetchError(error) {
   const message = String(error?.message || "");
-  return error?.name === "TimeoutError" || message.includes("network");
+  return error?.name === "TimeoutError" || error?.name === "AbortError" || message.includes("network");
 }
 
 function wait(ms) {
@@ -209,6 +255,7 @@ function normalizeItem(item, feed, parsedFeed) {
     link: item.link,
     publishedAt,
     source: feed.name || parsedFeed.title || hostnameFromUrl(feed.url),
+    sourcePriority: toSignedInteger(feed.priority, 0),
     image: extractImage(item),
     summary: buildSummary(item)
   };
@@ -325,7 +372,6 @@ function pickImageUrl(entry) {
   }
 
   const values = [entry.url, entry.$?.url, entry.href, entry.$?.href, entry.link, entry.path];
-
   return values.find((value) => typeof value === "string" && isUsableImageUrl(value)) || null;
 }
 
@@ -357,14 +403,37 @@ function getDisplaySettings(config) {
   };
 }
 
-function enrichItemForDisplay(item) {
+function buildMeta(config, snapshot) {
+  const enabledFeedCount = Array.isArray(config.feeds)
+    ? config.feeds.filter((feed) => feed.enabled !== false && feed.url).length
+    : 0;
+
+  return {
+    title: config.dashboardTitle || "Dashboard RSS",
+    refreshMinutes: getCacheTtlMinutes(config),
+    cacheTtlMinutes: getCacheTtlMinutes(config),
+    maxItems: config.maxItems || 24,
+    timezone: config.timezone || "Europe/Paris",
+    generatedAt: snapshot.generatedAt || new Date().toISOString(),
+    enabledFeedCount,
+    display: getDisplaySettings(config),
+    statusSummary: snapshot.statusSummary
+  };
+}
+
+function enrichItemForDisplay(item, config) {
   const ageMinutes = getAgeMinutes(item.publishedAt);
+  const criticality = matchCriticality(item, config);
   return {
     ...item,
     ageMinutes,
     freshnessLabel: formatFreshness(ageMinutes),
     freshnessClass: getFreshnessClass(ageMinutes),
-    score: computePriorityScore(item, ageMinutes)
+    criticalityLabel: criticality.label,
+    criticalityClass: criticality.className,
+    criticalityBoost: criticality.boost,
+    matchedKeyword: criticality.matchedKeyword,
+    score: computePriorityScore(item, ageMinutes, criticality)
   };
 }
 
@@ -374,24 +443,90 @@ function deduplicateItems(item, index, items) {
 }
 
 function buildDedupKey(item) {
-  const normalizedLink = String(item.link || "").trim().toLowerCase();
+  const normalizedLink = normalizeLink(item.link);
   if (normalizedLink) {
-    return normalizedLink;
+    return `link:${normalizedLink}`;
   }
 
-  return String(item.title || "").trim().toLowerCase();
+  return `title:${normalizeTitle(item.title)}`;
+}
+
+function normalizeLink(value) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(String(value).trim());
+    url.hash = "";
+    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"].forEach((key) => {
+      url.searchParams.delete(key);
+    });
+    const search = url.searchParams.toString();
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}${search ? `?${search}` : ""}`.toLowerCase();
+  } catch (_error) {
+    return String(value).trim().toLowerCase();
+  }
+}
+
+function normalizeTitle(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\b(the|a|an|le|la|les|de|des|du|un|une|and|et)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function compareItemsByPriority(left, right) {
   return computePriorityScore(right) - computePriorityScore(left);
 }
 
-function computePriorityScore(item, explicitAgeMinutes) {
+function computePriorityScore(item, explicitAgeMinutes, criticalityOverride) {
   const ageMinutes = Number.isFinite(explicitAgeMinutes) ? explicitAgeMinutes : getAgeMinutes(item.publishedAt);
+  const criticality = criticalityOverride || {
+    boost: item.criticalityBoost || 0
+  };
   const freshnessScore = Math.max(0, 20000 - ageMinutes);
   const summaryScore = item.summary ? Math.min(item.summary.length, 240) : 0;
   const imageScore = item.image ? 25 : 0;
-  return freshnessScore + summaryScore + imageScore;
+  const sourcePriorityScore = toSignedInteger(item.sourcePriority, 0) * 60;
+  const criticalityScore = toSignedInteger(criticality.boost, 0);
+  return freshnessScore + summaryScore + imageScore + sourcePriorityScore + criticalityScore;
+}
+
+function matchCriticality(item, config) {
+  const rules = Array.isArray(config?.criticalityRules) ? config.criticalityRules : [];
+  const haystack = `${item.title || ""} ${item.summary || ""}`.toLowerCase();
+  let best = null;
+
+  for (const rule of rules) {
+    const keywords = Array.isArray(rule?.keywords) ? rule.keywords : [];
+    const matchedKeyword = keywords.find((keyword) => keyword && haystack.includes(String(keyword).toLowerCase()));
+    if (!matchedKeyword) {
+      continue;
+    }
+
+    const candidate = {
+      label: rule.label || "Signal",
+      className: rule.className || "is-critical-medium",
+      boost: toSignedInteger(rule.boost, 0),
+      matchedKeyword
+    };
+
+    if (!best || candidate.boost > best.boost) {
+      best = candidate;
+    }
+  }
+
+  return best || {
+    label: "",
+    className: "",
+    boost: 0,
+    matchedKeyword: ""
+  };
 }
 
 function getAgeMinutes(value) {
@@ -435,6 +570,80 @@ function getFreshnessClass(ageMinutes) {
   return "";
 }
 
+function createStatusSummary(feedStatuses) {
+  const summary = {
+    total: feedStatuses.length,
+    ok: 0,
+    empty: 0,
+    timeout: 0,
+    error: 0
+  };
+
+  feedStatuses.forEach((feedStatus) => {
+    const key = summary[feedStatus.status] !== undefined ? feedStatus.status : "error";
+    summary[key] += 1;
+  });
+
+  return summary;
+}
+
+function updateFeedHealth(feed, nextStatus) {
+  const key = buildFeedKey(feed);
+  const previous = feedHealthMemory.get(key) || {
+    lastSuccessAt: null,
+    lastErrorAt: null
+  };
+  const timestamp = new Date().toISOString();
+
+  const feedStatus = {
+    name: feed.name || hostnameFromUrl(feed.url),
+    url: feed.url,
+    status: nextStatus.status,
+    itemCount: nextStatus.itemCount || 0,
+    durationMs: nextStatus.durationMs || 0,
+    message: nextStatus.message || "",
+    lastSuccessAt: previous.lastSuccessAt,
+    lastErrorAt: previous.lastErrorAt
+  };
+
+  if (feedStatus.status === "ok" || feedStatus.status === "empty") {
+    feedStatus.lastSuccessAt = timestamp;
+  }
+
+  if (feedStatus.status === "error" || feedStatus.status === "timeout") {
+    feedStatus.lastErrorAt = timestamp;
+  }
+
+  feedHealthMemory.set(key, feedStatus);
+  return feedStatus;
+}
+
+function buildFeedFailure(feed, error, durationMs = 0) {
+  const message = String(error?.message || "Erreur inconnue");
+  return {
+    items: [],
+    feedStatus: updateFeedHealth(feed, {
+      status: inferFeedErrorStatus(error),
+      itemCount: 0,
+      durationMs,
+      message
+    })
+  };
+}
+
+function inferFeedErrorStatus(error) {
+  const message = String(error?.message || "").toLowerCase();
+  if (error?.name === "TimeoutError" || error?.name === "AbortError" || message.includes("timeout")) {
+    return "timeout";
+  }
+
+  return "error";
+}
+
+function buildFeedKey(feed) {
+  return `${feed.name || ""}|${feed.url || ""}`;
+}
+
 function getCacheTtlMinutes(config) {
   return toPositiveInteger(config?.refreshMinutes, 5);
 }
@@ -455,4 +664,9 @@ async function resolveConfigPath() {
 function toPositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function toSignedInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }

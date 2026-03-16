@@ -6,9 +6,11 @@ Dashboard RSS moderne pour ecran de supervision, pense comme un template deploya
 
 - vue fixe adaptee a un ecran de supervision recharge automatiquement
 - article principal mis en avant avec image et resume
-- bloc d'indicateurs et titres secondaires recents
-- cartes prioritaires pour les articles suivants
-- cache serveur pour limiter les appels RSS
+- bloc d'indicateurs, sante des flux, et titres secondaires recents
+- cartes prioritaires avec badges de criticite
+- priorite configurable par source via `priority`
+- criticite configurable par mots-cles via `criticalityRules`
+- cache serveur et endpoint de supervision `/api/status`
 - configuration utilisateur externalisable via `CONFIG_PATH`
 - deploiement simple avec Docker ou Portainer
 
@@ -29,8 +31,11 @@ Ordre de recherche de la configuration:
 - `dashboardTitle` : titre visible sur l'ecran
 - `refreshMinutes` : duree de cache serveur en minutes
 - `maxItems` : nombre maximum d'articles agreges
+- `requestTimeoutMs` : timeout reseau par flux
 - `timezone` : fuseau horaire d'affichage
 - `display.itemsPerPage` : nombre d'articles prepares pour la vue fixe
+- `criticalityRules` : regles simples de criticite basees sur mots-cles
+- `feeds[].priority` : poids de priorite par source, defaut `0`
 - `feeds` : liste des flux RSS
 
 Exemple:
@@ -45,15 +50,62 @@ Exemple:
   "display": {
     "itemsPerPage": 10
   },
+  "criticalityRules": [
+    {
+      "label": "Alerte",
+      "className": "is-critical-high",
+      "boost": 600,
+      "keywords": ["ransomware", "zero-day", "0day", "exploit"]
+    }
+  ],
   "feeds": [
     {
-      "name": "Bleeping Computer",
-      "url": "https://www.bleepingcomputer.com/feed/",
-      "enabled": true
+      "name": "CERT-FR",
+      "url": "https://www.cert.ssi.gouv.fr/feed/",
+      "enabled": true,
+      "priority": 3
     }
   ]
 }
 ```
+
+## Compatibilite
+
+Les nouveaux champs sont optionnels.
+
+Si `priority` ou `criticalityRules` ne sont pas renseignes:
+
+- le dashboard continue de fonctionner
+- le score repose essentiellement sur la fraicheur
+- aucun badge de criticite n'est affiche
+
+## APIs
+
+### `GET /api/feed`
+
+Retourne:
+
+- `meta` : titre, timezone, cache, resume de sante des flux
+- `items` : articles enrichis avec fraicheur, criticite, priorite source et score
+
+Champs d'article utiles:
+
+- `sourcePriority`
+- `criticalityLabel`
+- `criticalityClass`
+- `matchedKeyword`
+- `criticalityBoost`
+- `score`
+
+### `GET /api/status`
+
+Endpoint de supervision pour suivre:
+
+- la date du dernier snapshot
+- l'age du cache
+- le resume global des flux
+- l'etat detaille par flux: `ok`, `empty`, `timeout`, `error`
+- le nombre d'items, la duree de collecte et les derniers succes/erreurs
 
 ## Lancement local
 
@@ -104,7 +156,7 @@ services:
 Avant le deploiement:
 
 1. copie `feeds.example.json` en `feeds.json`
-2. adapte les flux a ton besoin
+2. adapte les flux, priorites, et mots-cles critiques
 3. deploie la stack
 
 Si tu utilises Portainer avec un depot Git en source, assure-toi que le bind mount ou le volume pointe vers un `feeds.json` present cote hote, pas vers le fichier exemple du repo.

@@ -1,9 +1,12 @@
 const feedGrid = document.getElementById("feed-grid");
 const metricsGrid = document.getElementById("metrics-grid");
 const headlineList = document.getElementById("headline-list");
+const healthSummary = document.getElementById("health-summary");
+const healthList = document.getElementById("health-list");
 const rowTemplate = document.getElementById("row-template");
 const metricTemplate = document.getElementById("metric-template");
 const headlineTemplate = document.getElementById("headline-template");
+const healthTemplate = document.getElementById("health-template");
 const dashboardTitle = document.getElementById("dashboard-title");
 const boardSubtitle = document.getElementById("board-subtitle");
 const generatedAt = document.getElementById("generated-at");
@@ -25,29 +28,38 @@ const GRID_COUNT = 6;
 boot();
 
 async function boot() {
-  await loadFeed();
+  await loadDashboard();
 }
 
-async function loadFeed() {
+async function loadDashboard() {
   try {
     refreshLabel.textContent = "Chargement des flux";
 
-    const response = await fetch("/api/feed", { cache: "no-store" });
-    const payload = await response.json();
+    const [feedPayload, statusPayload] = await Promise.all([
+      fetchJson("/api/feed"),
+      fetchJson("/api/status")
+    ]);
 
-    if (!response.ok) {
-      throw new Error(payload.details || payload.error || "Erreur inconnue");
-    }
-
-    renderDashboard(payload);
+    renderDashboard(feedPayload, statusPayload);
   } catch (error) {
     renderError(error.message);
   }
 }
 
-function renderDashboard(payload) {
-  const items = Array.isArray(payload.items) ? payload.items : [];
-  const meta = payload.meta || {};
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.details || payload.error || "Erreur inconnue");
+  }
+
+  return payload;
+}
+
+function renderDashboard(feedPayload, statusPayload) {
+  const items = Array.isArray(feedPayload.items) ? feedPayload.items : [];
+  const meta = feedPayload.meta || {};
   const timezone = meta.timezone || "Europe/Paris";
   const formatters = buildFormatters(timezone);
   const featuredItem = items[0] || null;
@@ -58,22 +70,25 @@ function renderDashboard(payload) {
   dashboardTitle.textContent = meta.title || "Dashboard RSS";
   boardSubtitle.textContent = `${items.length} article${items.length > 1 ? "s" : ""} agreges | ${visibleCount} visibles sur cet ecran`;
   generatedAt.textContent = `Instantane genere le ${formatSafeDate(meta.generatedAt, formatters.generated, "date inconnue")}`;
-  refreshLabel.textContent = formatCacheStatus(meta.cacheTtlMinutes);
+  refreshLabel.textContent = formatCacheStatus(meta.cacheTtlMinutes, meta.statusSummary);
 
   renderFeatured(featuredItem, formatters);
   renderMetrics(items, meta);
+  renderHealth(statusPayload, formatters);
   renderHeadlines(headlineItems);
   renderGrid(gridItems, formatters);
 }
 
 function renderFeatured(item, formatters) {
   resetImage(featuredImage, featuredImageFallback);
+  featuredSource.textContent = "";
+  featuredFreshness.textContent = "";
+  featuredFreshness.className = "freshness-badge";
 
   if (!item) {
     featuredTitle.textContent = "Aucun article a afficher";
     featuredSource.textContent = "Sources";
     featuredFreshness.textContent = "En attente";
-    featuredFreshness.className = "freshness-badge";
     featuredTime.textContent = "--:--";
     featuredDate.textContent = "Aucune date";
     featuredSummary.textContent = "Le dashboard n'a remonte aucun article exploitable pour le moment.";
@@ -88,20 +103,35 @@ function renderFeatured(item, formatters) {
   featuredFreshness.className = `freshness-badge ${item.freshnessClass || ""}`.trim();
   featuredTime.textContent = formatSafeDate(item.publishedAt, formatters.time, "--:--");
   featuredDate.textContent = formatSafeDate(item.publishedAt, formatters.date, "Date inconnue");
-  featuredSummary.textContent = summarize(item.summary || item.link, 340);
+  featuredSummary.textContent = buildFeaturedSummary(item);
   featuredLink.href = item.link;
   featuredLink.removeAttribute("aria-disabled");
 
   applyImage(item.image, item.title, featuredImage, featuredImageFallback, "visible");
 }
 
+function buildFeaturedSummary(item) {
+  const parts = [];
+  if (item.criticalityLabel) {
+    const detail = item.matchedKeyword ? ` via "${item.matchedKeyword}"` : "";
+    parts.push(`${item.criticalityLabel}${detail}.`);
+  }
+
+  const excerpt = summarize(item.summary || item.link, 280);
+  if (excerpt) {
+    parts.push(excerpt);
+  }
+
+  return parts.join(" ");
+}
+
 function renderMetrics(items, meta) {
   const uniqueSources = new Set(items.map((item) => item.source).filter(Boolean)).size;
   const hotItems = items.filter((item) => item.ageMinutes <= 120).length;
+  const criticalItems = items.filter((item) => Boolean(item.criticalityLabel)).length;
   const avgAge = items.length
     ? Math.round(items.reduce((total, item) => total + sanitizeAge(item.ageMinutes), 0) / items.length)
     : 0;
-  const freshest = items[0]?.freshnessLabel || "N/A";
   const metrics = [
     {
       label: "Flux actifs",
@@ -114,13 +144,13 @@ function renderMetrics(items, meta) {
       note: "Publies il y a moins de 2 h"
     },
     {
-      label: "Age moyen",
-      value: formatAgeValue(avgAge),
-      note: "Sur les articles agreges"
+      label: "Signaux critiques",
+      value: criticalItems,
+      note: "Mots-cles critiques detectes"
     },
     {
-      label: "Plus recent",
-      value: freshest,
+      label: "Age moyen",
+      value: formatAgeValue(avgAge),
       note: `Cache serveur ${formatCacheTtl(meta.cacheTtlMinutes)}`
     }
   ];
@@ -136,6 +166,37 @@ function renderMetrics(items, meta) {
   });
 }
 
+function renderHealth(statusPayload, formatters) {
+  const feedStatuses = Array.isArray(statusPayload?.feeds) ? statusPayload.feeds : [];
+  const summary = statusPayload?.meta?.statusSummary || createEmptyStatusSummary();
+
+  healthSummary.innerHTML = "";
+  healthList.innerHTML = "";
+
+  healthSummary.appendChild(createSummaryBadge(`${summary.ok} OK`, "is-ok"));
+  healthSummary.appendChild(createSummaryBadge(`${summary.empty} vides`, "is-empty"));
+  healthSummary.appendChild(createSummaryBadge(`${summary.timeout} timeout`, "is-timeout"));
+  healthSummary.appendChild(createSummaryBadge(`${summary.error} erreurs`, "is-error"));
+
+  if (!feedStatuses.length) {
+    healthList.innerHTML = `<div class="empty-state compact">Aucun etat de flux disponible.</div>`;
+    return;
+  }
+
+  feedStatuses
+    .slice()
+    .sort(compareHealthStatuses)
+    .forEach((feedStatus) => {
+      const fragment = healthTemplate.content.cloneNode(true);
+      const statusPill = fragment.querySelector(".health-status");
+      fragment.querySelector(".health-name").textContent = feedStatus.name || "Flux";
+      statusPill.textContent = formatFeedStatusLabel(feedStatus.status);
+      statusPill.classList.add(getHealthStatusClass(feedStatus.status));
+      fragment.querySelector(".health-note").textContent = buildHealthNote(feedStatus, formatters);
+      healthList.appendChild(fragment);
+    });
+}
+
 function renderHeadlines(items) {
   headlineList.innerHTML = "";
 
@@ -146,9 +207,11 @@ function renderHeadlines(items) {
 
   items.forEach((item) => {
     const fragment = headlineTemplate.content.cloneNode(true);
+    const criticalityBadge = fragment.querySelector(".headline-criticality");
     fragment.querySelector(".headline-source").textContent = item.source || "Source";
     fragment.querySelector(".headline-freshness").textContent = item.freshnessLabel || "N/A";
     fragment.querySelector(".headline-title").textContent = item.title;
+    applyCriticalityBadge(criticalityBadge, item);
     headlineList.appendChild(fragment);
   });
 }
@@ -167,6 +230,7 @@ function renderGrid(items, formatters) {
     const image = fragment.querySelector(".thumb");
     const fallback = fragment.querySelector(".thumb-fallback");
     const freshnessBadge = fragment.querySelector(".freshness-badge");
+    const criticalityBadge = fragment.querySelector(".criticality-badge");
     const publishedDate = new Date(item.publishedAt);
     const hasValidDate = Number.isFinite(publishedDate.getTime());
 
@@ -180,6 +244,7 @@ function renderGrid(items, formatters) {
       freshnessBadge.classList.add(item.freshnessClass);
     }
 
+    applyCriticalityBadge(criticalityBadge, item);
     applyImage(item.image, item.title, image, fallback, "visible");
 
     row.style.setProperty("--delay-index", index);
@@ -203,6 +268,8 @@ function renderError(message) {
   featuredLink.setAttribute("aria-disabled", "true");
   resetImage(featuredImage, featuredImageFallback);
   metricsGrid.innerHTML = `<div class="empty-state compact is-error">Le backend n'a pas pu agreger les flux.</div>`;
+  healthSummary.innerHTML = "";
+  healthList.innerHTML = `<div class="empty-state compact is-error">Le panneau de sante est indisponible.</div>`;
   headlineList.innerHTML = "";
   feedGrid.innerHTML = `<div class="empty-state is-error">${escapeHtml(message)}</div>`;
 }
@@ -230,6 +297,21 @@ function buildFormatters(timezone) {
       timeZone: timezone
     })
   };
+}
+
+function applyCriticalityBadge(element, item) {
+  element.textContent = item.criticalityLabel || "";
+  element.className = "criticality-badge";
+
+  if (!item.criticalityLabel) {
+    element.classList.add("is-hidden");
+    return;
+  }
+
+  element.classList.add("is-visible");
+  if (item.criticalityClass) {
+    element.classList.add(item.criticalityClass);
+  }
 }
 
 function applyImage(src, alt, imageElement, fallbackElement, visibleClass) {
@@ -287,13 +369,69 @@ function formatAgeValue(ageMinutes) {
   return `${Math.round(ageMinutes / 1440)} j`;
 }
 
-function formatCacheStatus(cacheTtlMinutes) {
-  return `Vue fixe | cache ${formatCacheTtl(cacheTtlMinutes)}`;
+function formatCacheStatus(cacheTtlMinutes, statusSummary) {
+  const summary = statusSummary || createEmptyStatusSummary();
+  return `Vue fixe | cache ${formatCacheTtl(cacheTtlMinutes)} | ${summary.ok}/${summary.total || 0} flux OK`;
 }
 
 function formatCacheTtl(cacheTtlMinutes) {
   const minutes = Number.isFinite(cacheTtlMinutes) && cacheTtlMinutes > 0 ? cacheTtlMinutes : 5;
   return `${minutes} min`;
+}
+
+function formatFeedStatusLabel(status) {
+  const labels = {
+    ok: "OK",
+    empty: "Vide",
+    timeout: "Timeout",
+    error: "Erreur"
+  };
+  return labels[status] || "Inconnu";
+}
+
+function getHealthStatusClass(status) {
+  return `is-${status || "error"}`;
+}
+
+function buildHealthNote(feedStatus, formatters) {
+  const durationLabel = Number.isFinite(feedStatus.durationMs) ? `${feedStatus.durationMs} ms` : "n/a";
+  const itemsLabel = `${feedStatus.itemCount || 0} article${feedStatus.itemCount > 1 ? "s" : ""}`;
+
+  if (feedStatus.status === "ok" || feedStatus.status === "empty") {
+    const successLabel = formatSafeDate(feedStatus.lastSuccessAt, formatters.generated, "date inconnue");
+    return `${itemsLabel} | ${durationLabel} | dernier succes ${successLabel}`;
+  }
+
+  const errorMessage = feedStatus.message || "Erreur non detaillee";
+  const errorLabel = formatSafeDate(feedStatus.lastErrorAt, formatters.generated, "date inconnue");
+  return `${itemsLabel} | ${durationLabel} | ${errorMessage} | ${errorLabel}`;
+}
+
+function createSummaryBadge(label, className) {
+  const element = document.createElement("span");
+  element.className = `health-pill ${className}`;
+  element.textContent = label;
+  return element;
+}
+
+function compareHealthStatuses(left, right) {
+  const order = {
+    error: 0,
+    timeout: 1,
+    empty: 2,
+    ok: 3
+  };
+  return (order[left.status] ?? 99) - (order[right.status] ?? 99);
+}
+
+function createEmptyStatusSummary() {
+  return {
+    total: 0,
+    ok: 0,
+    empty: 0,
+    timeout: 0,
+    error: 0
+  };
 }
 
 function escapeHtml(value) {

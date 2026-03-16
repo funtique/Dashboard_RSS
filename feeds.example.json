@@ -7,21 +7,44 @@
   "display": {
     "itemsPerPage": 10
   },
+  "criticalityRules": [
+    {
+      "label": "Alerte",
+      "className": "is-critical-high",
+      "boost": 600,
+      "keywords": ["ransomware", "zero-day", "0day", "exploit", "breach", "intrusion"]
+    },
+    {
+      "label": "Vuln",
+      "className": "is-critical-medium",
+      "boost": 300,
+      "keywords": ["cve", "vulnerability", "patch", "advisory", "critical"]
+    },
+    {
+      "label": "Surveille",
+      "className": "is-critical-watch",
+      "boost": 120,
+      "keywords": ["phishing", "malware", "botnet", "leak"]
+    }
+  ],
   "feeds": [
     {
       "name": "Bleeping Computer",
       "url": "https://www.bleepingcomputer.com/feed/",
-      "enabled": true
+      "enabled": true,
+      "priority": 1
     },
     {
       "name": "The Hacker News",
       "url": "https://feeds.feedburner.com/TheHackersNews",
-      "enabled": true
+      "enabled": true,
+      "priority": 1
     },
     {
       "name": "CERT-FR",
       "url": "https://www.cert.ssi.gouv.fr/feed/",
-      "enabled": true
+      "enabled": true,
+      "priority": 3
     }
   ]
 }
