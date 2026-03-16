@@ -152,6 +152,17 @@ h1 {
   font-size: 0.98rem;
 }
 
+.view-link {
+  color: var(--accent-cyan);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.view-link:hover {
+  text-decoration: underline;
+}
+
 .dashboard-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
@@ -753,5 +764,203 @@ h1 {
   .health-card-top {
     display: grid;
     grid-template-columns: 1fr;
+  }
+}
+
+.fixed-page {
+  min-height: 100vh;
+  overflow: hidden;
+  background: #06111d;
+  color: var(--text);
+}
+
+.fixed-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  padding: 16px;
+  gap: 14px;
+  background: linear-gradient(180deg, #08131f, #050b12);
+}
+
+.fixed-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fixed-kicker,
+.fixed-subtitle,
+.fixed-generated {
+  margin: 0;
+}
+
+.fixed-kicker {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8bbfd8;
+}
+
+.fixed-title {
+  font-size: clamp(1.4rem, 2vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.fixed-meta {
+  text-align: right;
+  color: rgba(244, 248, 251, 0.7);
+  font-size: 0.9rem;
+}
+
+.fixed-grid {
+  --fixed-columns: 4;
+  --fixed-rows: 3;
+  display: grid;
+  grid-template-columns: repeat(var(--fixed-columns), minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 10px;
+  min-height: 0;
+}
+
+.fixed-card,
+.fixed-empty {
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0b1826;
+}
+
+.fixed-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 10px;
+}
+
+.fixed-card-top,
+.fixed-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.fixed-source,
+.fixed-age,
+.fixed-date,
+.fixed-criticality {
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.fixed-source {
+  color: #8fd3e8;
+}
+
+.fixed-age {
+  color: #d5e4eb;
+}
+
+.fixed-card-title {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.22;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.fixed-card-summary {
+  color: rgba(244, 248, 251, 0.68);
+  font-size: 0.88rem;
+  line-height: 1.32;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.fixed-date {
+  color: rgba(244, 248, 251, 0.6);
+}
+
+.fixed-criticality {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fixed-grid[data-density="compact"] .fixed-card {
+  padding: 10px;
+  gap: 8px;
+}
+
+.fixed-grid[data-density="compact"] .fixed-card-title {
+  font-size: 0.92rem;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.fixed-grid[data-density="compact"] .fixed-card-summary {
+  font-size: 0.8rem;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.fixed-grid[data-density="tight"] .fixed-card {
+  padding: 8px;
+  gap: 6px;
+}
+
+.fixed-grid[data-density="tight"] .fixed-source,
+.fixed-grid[data-density="tight"] .fixed-age,
+.fixed-grid[data-density="tight"] .fixed-date,
+.fixed-grid[data-density="tight"] .fixed-criticality {
+  font-size: 0.7rem;
+}
+
+.fixed-grid[data-density="tight"] .fixed-card-title {
+  font-size: 0.84rem;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.fixed-grid[data-density="tight"] .fixed-card-summary {
+  font-size: 0.74rem;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.fixed-empty {
+  display: grid;
+  place-items: center;
+  grid-column: 1 / -1;
+  text-align: center;
+  font-weight: 700;
+}
+
+.fixed-empty.is-error {
+  border-color: rgba(255, 94, 102, 0.4);
+  color: #ffd5d8;
+}
+
+@media (max-width: 1100px) {
+  .fixed-topbar {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .fixed-meta {
+    text-align: left;
   }
 }

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard RSS | Flux fixe</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="fixed-page">
+    <main class="fixed-shell">
+      <header class="fixed-topbar">
+        <div>
+          <p class="fixed-kicker">Flux fixe</p>
+          <h1 id="fixed-title" class="fixed-title">Chargement...</h1>
+        </div>
+        <div class="fixed-meta">
+          <p id="fixed-subtitle" class="fixed-subtitle"></p>
+          <p id="fixed-generated" class="fixed-generated"></p>
+        </div>
+      </header>
+
+      <section id="fixed-grid" class="fixed-grid" aria-live="polite"></section>
+    </main>
+
+    <template id="fixed-card-template">
+      <article class="fixed-card">
+        <div class="fixed-card-top">
+          <span class="fixed-source"></span>
+          <span class="fixed-age"></span>
+        </div>
+        <p class="fixed-card-title"></p>
+        <p class="fixed-card-summary"></p>
+        <div class="fixed-card-bottom">
+          <span class="fixed-date"></span>
+          <span class="fixed-criticality"></span>
+        </div>
+      </article>
+    </template>
+
+    <script src="/fixed.js" defer></script>
+  </body>
+</html>
