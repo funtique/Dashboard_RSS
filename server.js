@@ -36,16 +36,20 @@ app.get("/api/feed", async (_req, res) => {
   try {
     const config = await readConfig();
     const items = await getCachedFeedItems(config);
-    const display = getDisplaySettings(config);
+    const enabledFeedCount = Array.isArray(config.feeds)
+      ? config.feeds.filter((feed) => feed.enabled !== false && feed.url).length
+      : 0;
 
     res.json({
       meta: {
         title: config.dashboardTitle || "Dashboard RSS",
-        refreshMinutes: config.refreshMinutes || 10,
+        refreshMinutes: getCacheTtlMinutes(config),
+        cacheTtlMinutes: getCacheTtlMinutes(config),
         maxItems: config.maxItems || 24,
         timezone: config.timezone || "Europe/Paris",
         generatedAt: cache.generatedAt || new Date().toISOString(),
-        display
+        enabledFeedCount,
+        display: getDisplaySettings(config)
       },
       items
     });
@@ -76,20 +80,16 @@ async function loadFeedItems(config) {
 
   const items = settled
     .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
-    .sort((left, right) => {
-      const leftDate = new Date(left.publishedAt).getTime() || 0;
-      const rightDate = new Date(right.publishedAt).getTime() || 0;
-      return rightDate - leftDate;
-    });
+    .filter(deduplicateItems)
+    .sort(compareItemsByPriority);
 
   const limitedItems = items.slice(0, config.maxItems || 24);
   await enrichItemsWithImages(limitedItems);
-  return limitedItems;
+  return limitedItems.map(enrichItemForDisplay);
 }
 
 async function getCachedFeedItems(config) {
-  const refreshMinutes = config.refreshMinutes || 10;
-  const refreshWindowMs = refreshMinutes * 60 * 1000;
+  const refreshWindowMs = getCacheTtlMinutes(config) * 60 * 1000;
   const now = Date.now();
 
   if (cache.generatedAt) {
@@ -347,9 +347,91 @@ function hostnameFromUrl(value) {
 function getDisplaySettings(config) {
   const display = config?.display || {};
   return {
-    itemsPerPage: toPositiveInteger(display.itemsPerPage, 12),
-    rotationSeconds: toPositiveInteger(display.rotationSeconds, 20)
+    itemsPerPage: toPositiveInteger(display.itemsPerPage, 10),
+    rotationSeconds: toPositiveInteger(display.rotationSeconds, 0)
   };
+}
+
+function enrichItemForDisplay(item) {
+  const ageMinutes = getAgeMinutes(item.publishedAt);
+  return {
+    ...item,
+    ageMinutes,
+    freshnessLabel: formatFreshness(ageMinutes),
+    freshnessClass: getFreshnessClass(ageMinutes),
+    score: computePriorityScore(item, ageMinutes)
+  };
+}
+
+function deduplicateItems(item, index, items) {
+  const key = buildDedupKey(item);
+  return items.findIndex((entry) => buildDedupKey(entry) === key) === index;
+}
+
+function buildDedupKey(item) {
+  const normalizedLink = String(item.link || "").trim().toLowerCase();
+  if (normalizedLink) {
+    return normalizedLink;
+  }
+
+  return String(item.title || "").trim().toLowerCase();
+}
+
+function compareItemsByPriority(left, right) {
+  return computePriorityScore(right) - computePriorityScore(left);
+}
+
+function computePriorityScore(item, explicitAgeMinutes) {
+  const ageMinutes = Number.isFinite(explicitAgeMinutes) ? explicitAgeMinutes : getAgeMinutes(item.publishedAt);
+  const freshnessScore = Math.max(0, 20000 - ageMinutes);
+  const summaryScore = item.summary ? Math.min(item.summary.length, 240) : 0;
+  const imageScore = item.image ? 25 : 0;
+  return freshnessScore + summaryScore + imageScore;
+}
+
+function getAgeMinutes(value) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+}
+
+function formatFreshness(ageMinutes) {
+  if (!Number.isFinite(ageMinutes) || ageMinutes === Number.MAX_SAFE_INTEGER) {
+    return "N/A";
+  }
+
+  if (ageMinutes < 60) {
+    return `${ageMinutes} min`;
+  }
+
+  if (ageMinutes < 1440) {
+    return `${Math.round(ageMinutes / 60)} h`;
+  }
+
+  return `${Math.round(ageMinutes / 1440)} j`;
+}
+
+function getFreshnessClass(ageMinutes) {
+  if (!Number.isFinite(ageMinutes)) {
+    return "";
+  }
+
+  if (ageMinutes <= 120) {
+    return "is-hot";
+  }
+
+  if (ageMinutes <= 720) {
+    return "is-fresh";
+  }
+
+  return "";
+}
+
+function getCacheTtlMinutes(config) {
+  return toPositiveInteger(config?.refreshMinutes, 5);
 }
 
 function toPositiveInteger(value, fallback) {

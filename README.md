@@ -1,15 +1,15 @@
 # Dashboard RSS
 
-Dashboard RSS moderne pour ecran de supervision, avec aggregation de plusieurs flux et affichage des derniers articles sous forme de tableau.
+Dashboard RSS moderne pour ecran de supervision, avec aggregation de plusieurs flux et affichage fixe des articles les plus recents.
 
 ## Fonctionnalites
 
-- affichage de l'image d'illustration si disponible
-- titre de l'article
-- heure et date de publication
-- site source
+- vue fixe adaptee a un ecran de supervision recharge automatiquement
+- article principal mis en avant avec image et resume
+- bloc d'indicateurs et titres secondaires recents
+- cartes prioritaires pour les articles suivants
 - configuration simple via `feeds.json`
-- rafraichissement automatique
+- cache serveur pour limiter les appels RSS
 - deploiement Docker simple pour Portainer ou Raspberry Pi
 
 ## Configuration
@@ -17,11 +17,10 @@ Dashboard RSS moderne pour ecran de supervision, avec aggregation de plusieurs f
 Edite `feeds.json` :
 
 - `dashboardTitle` : titre visible sur l'ecran
-- `refreshMinutes` : frequence de rafraichissement
+- `refreshMinutes` : duree de cache serveur en minutes
 - `maxItems` : nombre maximum d'articles affiches
 - `timezone` : fuseau horaire d'affichage
-- `display.itemsPerPage` : nombre de cartes affichees par page (defaut: 12)
-- `display.rotationSeconds` : rotation automatique des pages en secondes (defaut: 20)
+- `display.itemsPerPage` : nombre d'articles prepares pour la vue fixe (defaut: 10)
 - `feeds` : liste des flux RSS
 
 Exemple :
@@ -33,8 +32,7 @@ Exemple :
   "maxItems": 24,
   "timezone": "Europe/Paris",
   "display": {
-    "itemsPerPage": 12,
-    "rotationSeconds": 20
+    "itemsPerPage": 10
   },
   "feeds": [
     {
@@ -72,3 +70,4 @@ L'URL a utiliser cote navigateur est donc `http://<ip-du-rpi>:3001`.
 
 - certains flux ne fournissent pas toujours d'image
 - les flux en erreur sont ignores sans bloquer tout le dashboard
+- le navigateur ou le systeme d'affichage peut recharger l'onglet plus frequemment que le cache serveur

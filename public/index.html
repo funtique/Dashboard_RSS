@@ -9,26 +9,76 @@
   <body>
     <div class="app-shell">
       <div class="bg-grid" aria-hidden="true"></div>
+
       <header class="topbar">
-        <div>
-          <p class="eyebrow">Cyber Monitoring</p>
+        <div class="title-block">
+          <p class="eyebrow">Cyber Monitoring Wall</p>
           <h1 id="dashboard-title">Veille RSS</h1>
+          <p id="board-subtitle" class="board-subtitle"></p>
         </div>
+
         <div class="status-block">
           <div class="status-pill">
             <span class="status-dot"></span>
-            <span id="refresh-label">Mise a jour...</span>
+            <span id="refresh-label">Initialisation</span>
           </div>
           <p id="generated-at" class="generated-at"></p>
         </div>
       </header>
 
-      <main>
-        <section class="board-card">
-          <div class="board-head">
+      <main class="dashboard-layout">
+        <section class="hero-panel board-card">
+          <div class="panel-head">
             <div>
-              <p class="board-label">Flux recents</p>
-              <p id="board-subtitle" class="board-subtitle"></p>
+              <p class="board-label">A la une</p>
+              <h2 id="featured-title" class="panel-title">Chargement...</h2>
+            </div>
+            <div class="hero-badges">
+              <span id="featured-source" class="source-badge"></span>
+              <span id="featured-freshness" class="freshness-badge"></span>
+            </div>
+          </div>
+
+          <div class="hero-body">
+            <div class="hero-media">
+              <img id="featured-image" class="hero-image" alt="" loading="eager" />
+              <div id="featured-image-fallback" class="hero-image-fallback">RSS</div>
+            </div>
+
+            <div class="hero-content">
+              <div class="hero-meta">
+                <p id="featured-time" class="hero-time"></p>
+                <p id="featured-date" class="hero-date"></p>
+              </div>
+              <p id="featured-summary" class="hero-summary"></p>
+              <a id="featured-link" class="hero-link" href="#" target="_blank" rel="noreferrer">Ouvrir l'article</a>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side-panel board-card">
+          <div class="panel-head">
+            <div>
+              <p class="board-label">Vue instantanee</p>
+              <h2 class="panel-title">Signal du moment</h2>
+            </div>
+          </div>
+
+          <section id="metrics-grid" class="metrics-grid" aria-label="Indicateurs"></section>
+
+          <section class="headline-section">
+            <div class="headline-header">
+              <p class="board-label">Derniers titres</p>
+            </div>
+            <div id="headline-list" class="headline-list" aria-live="polite"></div>
+          </section>
+        </aside>
+
+        <section class="feed-panel board-card">
+          <div class="panel-head">
+            <div>
+              <p class="board-label">Flux prioritaires</p>
+              <h2 class="panel-title">Lecture fixe</h2>
             </div>
           </div>
 
@@ -37,25 +87,43 @@
       </main>
     </div>
 
-      <template id="row-template">
-        <article class="feed-card">
-          <div class="card-media">
-            <img class="thumb" alt="" loading="lazy" />
-            <div class="thumb-fallback">RSS</div>
-            <span class="source-badge"></span>
-            <span class="freshness-badge"></span>
-          </div>
+    <template id="metric-template">
+      <article class="metric-card">
+        <p class="metric-label"></p>
+        <p class="metric-value"></p>
+        <p class="metric-note"></p>
+      </article>
+    </template>
 
-          <div class="card-body">
-            <div class="publish-cell">
-              <p class="publish-time"></p>
-              <p class="publish-date"></p>
-            </div>
-            <p class="article-title"></p>
-            <p class="article-summary"></p>
+    <template id="headline-template">
+      <article class="headline-card">
+        <div class="headline-meta">
+          <span class="headline-source"></span>
+          <span class="headline-freshness"></span>
+        </div>
+        <p class="headline-title"></p>
+      </article>
+    </template>
+
+    <template id="row-template">
+      <article class="feed-card">
+        <div class="card-media">
+          <img class="thumb" alt="" loading="lazy" />
+          <div class="thumb-fallback">RSS</div>
+          <span class="source-badge"></span>
+          <span class="freshness-badge"></span>
+        </div>
+
+        <div class="card-body">
+          <div class="publish-cell">
+            <p class="publish-time"></p>
+            <p class="publish-date"></p>
           </div>
-        </article>
-      </template>
+          <p class="article-title"></p>
+          <p class="article-summary"></p>
+        </div>
+      </article>
+    </template>
 
     <script src="/app.js" defer></script>
   </body>

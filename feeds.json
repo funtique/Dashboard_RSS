@@ -5,8 +5,7 @@
   "requestTimeoutMs": 12000,
   "timezone": "Europe/Paris",
   "display": {
-    "itemsPerPage": 12,
-    "rotationSeconds": 20
+    "itemsPerPage": 10
   },
   "feeds": [
     {
