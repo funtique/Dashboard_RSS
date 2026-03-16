@@ -5,7 +5,11 @@ const Parser = require("rss-parser");
 
 const app = express();
 const port = process.env.PORT || 3000;
-const configPath = path.join(__dirname, "feeds.json");
+const configCandidates = [
+  process.env.CONFIG_PATH ? path.resolve(process.env.CONFIG_PATH) : null,
+  path.join(__dirname, "feeds.json"),
+  path.join(__dirname, "feeds.example.json")
+].filter(Boolean);
 
 const parserCustomFields = {
   item: [
@@ -66,7 +70,8 @@ app.listen(port, () => {
 });
 
 async function readConfig() {
-  const raw = await fs.readFile(configPath, "utf8");
+  const activeConfigPath = await resolveConfigPath();
+  const raw = await fs.readFile(activeConfigPath, "utf8");
   return JSON.parse(raw);
 }
 
@@ -432,6 +437,19 @@ function getFreshnessClass(ageMinutes) {
 
 function getCacheTtlMinutes(config) {
   return toPositiveInteger(config?.refreshMinutes, 5);
+}
+
+async function resolveConfigPath() {
+  for (const candidate of configCandidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch (_error) {
+      continue;
+    }
+  }
+
+  throw new Error("Aucun fichier de configuration trouve. Creez feeds.json a partir de feeds.example.json.");
 }
 
 function toPositiveInteger(value, fallback) {
