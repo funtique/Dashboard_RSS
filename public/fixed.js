@@ -3,6 +3,7 @@ const fixedTitle = document.getElementById("fixed-title");
 const fixedSubtitle = document.getElementById("fixed-subtitle");
 const fixedGenerated = document.getElementById("fixed-generated");
 const fixedCardTemplate = document.getElementById("fixed-card-template");
+const MAX_VISIBLE_ITEMS = 9;
 
 boot();
 
@@ -33,26 +34,29 @@ function renderFixedPage(payload) {
   const meta = payload?.meta || {};
   const timezone = meta.timezone || "Europe/Paris";
   const formatters = buildFormatters(timezone);
+  const visibleItems = selectVisibleItems(items);
 
   fixedTitle.textContent = `${meta.title || "Dashboard RSS"} | Mosaïque`;
-  fixedSubtitle.textContent = `${items.length} flux visibles sans defilement`;
+  fixedSubtitle.textContent = `${visibleItems.length} articles visibles d'un coup${items.length > visibleItems.length ? ` | ${items.length - visibleItems.length} en reserve` : ""}`;
   fixedGenerated.textContent = `Maj ${formatSafeDate(meta.generatedAt, formatters.generated, "inconnue")}`;
   fixedGrid.innerHTML = "";
 
-  if (!items.length) {
+  if (!visibleItems.length) {
     fixedGrid.innerHTML = `<div class="fixed-empty">Aucun article a afficher.</div>`;
     applyGridDensity();
     return;
   }
 
-  items.forEach((item) => {
+  visibleItems.forEach((item) => {
     const fragment = fixedCardTemplate.content.cloneNode(true);
     const criticality = fragment.querySelector(".fixed-criticality");
+    const image = fragment.querySelector(".fixed-image");
+    const fallback = fragment.querySelector(".fixed-image-fallback");
 
     fragment.querySelector(".fixed-source").textContent = item.source || "Source";
     fragment.querySelector(".fixed-age").textContent = item.freshnessLabel || "N/A";
     fragment.querySelector(".fixed-card-title").textContent = item.title || "Article sans titre";
-    fragment.querySelector(".fixed-card-summary").textContent = summarize(item.summary || item.link, 140);
+    fragment.querySelector(".fixed-card-summary").textContent = summarize(item.summary || item.link, 180);
     fragment.querySelector(".fixed-date").textContent = formatSafeDate(item.publishedAt, formatters.dateTime, "Date inconnue");
 
     if (item.criticalityLabel) {
@@ -65,10 +69,17 @@ function renderFixedPage(payload) {
       criticality.remove();
     }
 
+    applyImage(item.image, item.title, image, fallback);
     fixedGrid.appendChild(fragment);
   });
 
   applyGridDensity();
+}
+
+function selectVisibleItems(items) {
+  const preferredItems = items.filter((item) => item.image);
+  const fallbackItems = items.filter((item) => !item.image);
+  return preferredItems.concat(fallbackItems).slice(0, MAX_VISIBLE_ITEMS);
 }
 
 function applyGridDensity() {
@@ -94,11 +105,11 @@ function computeColumnCount(itemCount) {
 }
 
 function getDensityLevel(itemCount, rows) {
-  if (itemCount >= 16 || rows >= 4) {
+  if (itemCount >= 9 || rows >= 3) {
     return "tight";
   }
 
-  if (itemCount >= 9 || rows >= 3) {
+  if (itemCount >= 5 || rows >= 2) {
     return "compact";
   }
 
@@ -137,6 +148,32 @@ function summarize(value, limit) {
   }
 
   return `${text.slice(0, limit - 3).trimEnd()}...`;
+}
+
+function applyImage(src, alt, imageElement, fallbackElement) {
+  resetImage(imageElement, fallbackElement);
+
+  if (!src) {
+    return;
+  }
+
+  imageElement.src = src;
+  imageElement.alt = alt || "";
+  imageElement.classList.add("visible");
+  imageElement.addEventListener(
+    "error",
+    () => {
+      resetImage(imageElement, fallbackElement);
+    },
+    { once: true }
+  );
+  fallbackElement.style.display = "none";
+}
+
+function resetImage(imageElement, fallbackElement) {
+  imageElement.removeAttribute("src");
+  imageElement.classList.remove("visible");
+  fallbackElement.style.display = "grid";
 }
 
 function renderError(message) {
