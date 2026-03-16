@@ -1,7 +1,7 @@
 {
-  "dashboardTitle": "Veille RSS",
+  "dashboardTitle": "Veille Cyber",
   "refreshMinutes": 5,
-  "maxItems": 15,
+  "maxItems": 20,
   "requestTimeoutMs": 12000,
   "timezone": "Europe/Paris",
   "display": {
@@ -9,11 +9,6 @@
     "rotationSeconds": 20
   },
   "feeds": [
-    {
-      "name": "Korben",
-      "url": "https://korben.info/feed",
-      "enabled": true
-    },
     {
       "name": "Bleeping Computer",
       "url": "https://www.bleepingcomputer.com/feed/",
@@ -25,18 +20,28 @@
       "enabled": true
     },
     {
-      "name": "ZATAZ",
-      "url": "https://www.zataz.com/feed/",
-      "enabled": true
-    },
-    {
       "name": "CERT-FR",
       "url": "https://www.cert.ssi.gouv.fr/feed/",
       "enabled": true
     },
     {
+      "name": "CISA",
+      "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+      "enabled": true
+    },
+    {
+      "name": "SANS ISC",
+      "url": "https://isc.sans.edu/rssfeed.xml",
+      "enabled": true
+    },
+    {
       "name": "Krebs on Security",
       "url": "https://krebsonsecurity.com/feed/",
+      "enabled": true
+    },
+    {
+      "name": "ZATAZ",
+      "url": "https://www.zataz.com/feed/",
       "enabled": true
     }
   ]
